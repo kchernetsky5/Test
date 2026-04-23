@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Real Estate Assistant</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+  <!-- Login Screen -->
+  <div id="login-screen">
+    <div class="login-box">
+      <h1>Real Estate Assistant</h1>
+      <p>Enter your access code to continue.</p>
+      <form id="login-form">
+        <input
+          type="password"
+          id="access-code-input"
+          placeholder="Access code"
+          autocomplete="current-password"
+          required
+        />
+        <button type="submit">Continue</button>
+      </form>
+      <p id="login-error" class="error hidden">Incorrect access code. Please try again.</p>
+    </div>
+  </div>
+
+  <!-- Chat Screen -->
+  <div id="chat-screen" class="hidden">
+    <header>
+      <span class="header-title">Real Estate Assistant</span>
+      <button id="reset-btn" title="Clear conversation">New conversation</button>
+    </header>
+
+    <div id="messages"></div>
+
+    <div id="input-area">
+      <textarea
+        id="message-input"
+        placeholder="Ask a question..."
+        rows="1"
+      ></textarea>
+      <button id="send-btn">Send</button>
+    </div>
+  </div>
+
+  <script src="/static/chat.js"></script>
+</body>
+</html>
