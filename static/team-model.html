@@ -1,0 +1,418 @@
+<title>Real Team Leader Model</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: assumptions ledger on the left, live results on the right; stacks to one column on phones. */
+:root {
+  --bg: #f1f4f3;
+  --surface: #ffffff;
+  --ink: #15211f;
+  --muted: #5a6a66;
+  --line: #d6dedb;
+  --team: #0f6e5c;
+  --team-soft: #e1f0ec;
+  --ind: #3d4fa8;
+  --ind-soft: #e6e9f7;
+  --warn: #9a5b00;
+  --warn-soft: #fbf0dc;
+  --neg: #b42318;
+  --f-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Public Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1514; --surface: #162120; --ink: #e5eeeb; --muted: #94a6a1; --line: #2a3735;
+    --team: #4fc2a6; --team-soft: #17322c; --ind: #93a2f0; --ind-soft: #1e2440;
+    --warn: #f0b860; --warn-soft: #33270f; --neg: #ff8a7a; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1514; --surface: #162120; --ink: #e5eeeb; --muted: #94a6a1; --line: #2a3735;
+  --team: #4fc2a6; --team-soft: #17322c; --ind: #93a2f0; --ind-soft: #1e2440;
+  --warn: #f0b860; --warn-soft: #33270f; --neg: #ff8a7a; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 56px;
+}
+.wrap { max-width: 1240px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; }
+header h1 { font-family: var(--f-display); font-size: clamp(1.7rem, 3.4vw, 2.4rem); line-height: 1.1; margin: 0 0 6px; text-wrap: balance; }
+header p { margin: 0; color: var(--muted); max-width: 70ch; }
+.eyebrow { font-family: var(--f-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.grid { display: grid; grid-template-columns: minmax(0, 380px) minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 960px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* Inputs */
+.inputs { display: flex; flex-direction: column; gap: 14px; }
+fieldset { margin: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+legend { font-family: var(--f-display); font-weight: 600; font-size: 1.02rem; padding: 0 6px; margin-left: -6px; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) 128px; gap: 10px; align-items: center; }
+.row label { font-size: 13.5px; color: var(--ink); }
+.row label small { display: block; color: var(--muted); font-size: 12px; line-height: 1.3; }
+.field { position: relative; display: flex; align-items: center; }
+.field input, .field select { width: 100%; font: inherit; font-variant-numeric: tabular-nums; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 7px; padding: 6px 8px; text-align: right; }
+.field select { text-align: left; }
+.field.pre input { padding-left: 20px; }
+.field.suf input { padding-right: 26px; }
+.field .u { position: absolute; font-size: 12.5px; color: var(--muted); pointer-events: none; }
+.field.pre .u { left: 8px; } .field.suf .u { right: 8px; }
+input:focus-visible, select:focus-visible { outline: 2px solid var(--team); outline-offset: 1px; }
+.check { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; }
+.check input { margin-top: 4px; accent-color: var(--team); }
+.check small { display: block; color: var(--muted); font-size: 12px; }
+.sub { font-size: 12px; color: var(--muted); margin: 0; }
+.goal { border-color: var(--team); }
+
+/* Results */
+.results { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; min-width: 0; }
+.card h2 { font-family: var(--f-display); font-size: 1.25rem; margin: 0 0 4px; }
+.card > p.lede { margin: 0 0 14px; color: var(--muted); font-size: 13.5px; max-width: 70ch; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.tile { border-radius: 10px; padding: 14px 16px; background: var(--bg); display: flex; flex-direction: column; gap: 4px; }
+.tile.team { background: var(--team-soft); } .tile.ind { background: var(--ind-soft); }
+.tile .k { font-size: 12.5px; color: var(--muted); }
+.tile .v { font-family: var(--f-display); font-weight: 700; font-size: 1.9rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.tile.team .v { color: var(--team); } .tile.ind .v { color: var(--ind); }
+.tile .n { font-size: 12.5px; color: var(--muted); }
+.answer { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 4px; }
+.big { font-family: var(--f-display); font-weight: 700; font-size: 2.6rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.pill { display: inline-block; font-family: var(--f-mono); font-size: 11px; letter-spacing: .04em; padding: 2px 8px; border-radius: 99px; background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+.pill.team { color: var(--team); border-color: var(--team); background: transparent; }
+.pill.warn { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
+.tablewrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 14px; min-width: 520px; }
+th, td { padding: 7px 10px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; white-space: normal; }
+thead th { font-family: var(--f-mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+thead th.team { color: var(--team); } thead th.ind { color: var(--ind); }
+tr.sec td { font-family: var(--f-mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding-top: 14px; }
+tr.total td { font-weight: 600; border-bottom: 2px solid var(--ink); }
+td.neg { color: var(--neg); }
+td.muted { color: var(--muted); }
+.notes { font-size: 12.5px; color: var(--muted); margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.warnbox { background: var(--warn-soft); color: var(--warn); border-radius: 8px; padding: 8px 12px; font-size: 13px; }
+@media (max-width: 520px) { .answer { grid-template-columns: minmax(0, 1fr); } }
+.split2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">C2 · Real Broker team economics</div>
+    <h1>Real Team Leader Model</h1>
+    <p>Model what a team leader earns per agent under a team cap model versus the straight $12,000 independent model, and how many agents it takes to hit an income goal. Figures below are a loaded example; change any assumption on the left.</p>
+  </header>
+
+  <div class="grid">
+    <form class="inputs" id="f" autocomplete="off">
+      <fieldset class="goal">
+        <legend>Income goal</legend>
+        <div class="row"><label for="target">Team leader annual income goal</label><div class="field pre"><span class="u">$</span><input id="target" type="number" step="5000" value="250000"></div></div>
+        <div class="row"><label for="personal">Leader's own production income<small>Net from your personal deals</small></label><div class="field pre"><span class="u">$</span><input id="personal" type="number" step="1000" value="0"></div></div>
+        <div class="row"><label for="leaderExp">Leader annual expenses<small>Usually near $0: agents pay tech and TC</small></label><div class="field pre"><span class="u">$</span><input id="leaderExp" type="number" step="500" value="0"></div></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Typical agent production</legend>
+        <div class="row"><label for="price">Average sale price</label><div class="field pre"><span class="u">$</span><input id="price" type="number" step="10000" value="400000"></div></div>
+        <div class="row"><label for="txns">Closed transactions per year</label><div class="field"><input id="txns" type="number" step="1" value="12"></div></div>
+        <div class="row"><label for="comm">Commission per side</label><div class="field suf"><span class="u">%</span><input id="comm" type="number" step="0.1" value="2.5"></div></div>
+        <p class="sub" id="gciNote"></p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Where the business comes from</legend>
+        <div class="row"><label for="soiPct">Self-sourced / SOI</label><div class="field suf"><span class="u">%</span><input id="soiPct" type="number" step="5" min="0" max="100" value="60"></div></div>
+        <div class="row"><label for="zPct">Zillow Flex leads</label><div class="field suf"><span class="u">%</span><input id="zPct" type="number" step="5" min="0" max="100" value="40"></div></div>
+        <p class="sub">The two always add to 100%. Changing one updates the other.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Team split · SOI deals</legend>
+        <div class="row"><label for="soiSplit">Agent pays the team<small>Share of SOI GCI, until the cap</small></label><div class="field suf"><span class="u">%</span><input id="soiSplit" type="number" step="5" value="20"></div></div>
+        <div class="row"><label for="soiCap">Team cap per agent<small>Includes the Real team cap</small></label><div class="field pre"><span class="u">$</span><input id="soiCap" type="number" step="1000" value="16000"></div></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Team split · Zillow deals</legend>
+        <div class="row"><label for="zFee">Zillow referral fee<small>Paid to Zillow off the top at closing</small></label><div class="field suf"><span class="u">%</span><input id="zFee" type="number" step="1" value="40"></div></div>
+        <div class="row"><label for="zSplit">Team keeps of what's left<small>Agent keeps the rest</small></label><div class="field suf"><span class="u">%</span><input id="zSplit" type="number" step="5" value="50"></div></div>
+        <label class="check"><input id="zCap" type="checkbox"><span>Zillow split counts toward the team cap<small>Off means Zillow splits continue after the agent caps</small></span></label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Real Broker terms</legend>
+        <div class="row"><label for="realSplit">Real split until cap</label><div class="field suf"><span class="u">%</span><input id="realSplit" type="number" step="1" value="15"></div></div>
+        <div class="row"><label for="indCap">Independent agent cap</label><div class="field pre"><span class="u">$</span><input id="indCap" type="number" step="500" value="12000"></div></div>
+        <div class="row"><label for="teamCapMode">Team member cap<small id="teamCapNote"></small></label><div class="field"><select id="teamCapMode"><option value="auto">Auto</option><option value="6000">$6,000</option><option value="4000">$4,000</option></select></div></div>
+        <div class="row"><label for="rs1">Rev share · 1st line</label><div class="field suf"><span class="u">%</span><input id="rs1" type="number" step="0.01" value="33.33"></div></div>
+        <div class="row"><label for="rs2">Rev share · 2nd line</label><div class="field suf"><span class="u">%</span><input id="rs2" type="number" step="0.01" value="26.67"></div></div>
+        <div class="row"><label for="rs3">Rev share · 3rd line</label><div class="field suf"><span class="u">%</span><input id="rs3" type="number" step="0.01" value="20"></div></div>
+        <label class="check"><input id="sponsorTeam" type="checkbox" checked><span>Leader sponsors team members too<small>Earns 1st-line rev share on each member's Real cap</small></span></label>
+        <div class="row"><label for="postCap">Post-cap fee per deal<small>Paid by the agent after capping</small></label><div class="field pre"><span class="u">$</span><input id="postCap" type="number" step="5" value="285"></div></div>
+        <div class="row"><label for="annual">Real annual fee<small>Paid by the agent</small></label><div class="field pre"><span class="u">$</span><input id="annual" type="number" step="50" value="750"></div></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Agent-paid costs</legend>
+        <div class="row"><label for="tech">C2 technology fee<small>Per month</small></label><div class="field pre"><span class="u">$</span><input id="tech" type="number" step="1" value="39"></div></div>
+        <div class="row"><label for="tc">Transaction coordinator<small>Per closed deal</small></label><div class="field pre"><span class="u">$</span><input id="tc" type="number" step="25" value="350"></div></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Your roster</legend>
+        <div class="row"><label for="teamN">Agents on your team<small>Team cap model</small></label><div class="field"><input id="teamN" type="number" step="1" min="0" value="10"></div></div>
+        <div class="row"><label for="indN">Independent agents you recruit<small>Straight $12,000 cap, your 1st line</small></label><div class="field"><input id="indN" type="number" step="1" min="0" value="5"></div></div>
+        <label class="check"><input id="indFull" type="checkbox"><span>Independents keep full production<small>Off means they only close their SOI deals, since Zillow leads stay with the team</small></span></label>
+        <div class="row"><label for="ratio">Recruits each agent brings in<small>Builds your 2nd and 3rd line</small></label><div class="field"><input id="ratio" type="number" step="0.25" min="0" value="0.5"></div></div>
+        <div class="row"><label for="dGci">Downline agent average GCI</label><div class="field pre"><span class="u">$</span><input id="dGci" type="number" step="5000" value="60000"></div></div>
+      </fieldset>
+    </form>
+
+    <main class="results">
+      <section class="card">
+        <div class="eyebrow">The answer</div>
+        <h2 id="goalHead">Agents needed for your goal</h2>
+        <p class="lede" id="goalLede"></p>
+        <div class="answer" id="answer"></div>
+      </section>
+
+      <section class="card">
+        <div class="eyebrow">Per agent, per year</div>
+        <h2>What one agent is worth</h2>
+        <p class="lede">The leader's income from a single agent under each model, and what that agent takes home.</p>
+        <div class="tiles" id="tiles"></div>
+      </section>
+
+      <section class="card">
+        <div class="eyebrow">Your roster today</div>
+        <h2>Projected leader income</h2>
+        <p class="lede" id="rosterLede"></p>
+        <div class="tablewrap"><table id="roster"></table></div>
+      </section>
+
+      <section class="card">
+        <div class="eyebrow">Where each dollar goes</div>
+        <h2>Per-agent breakdown</h2>
+        <p class="lede">One typical agent, following the commission from closing to each party.</p>
+        <div class="tablewrap"><table id="waterfall"></table></div>
+      </section>
+
+      <section class="card">
+        <div class="eyebrow">Choosing a model</div>
+        <h2>$16,000 team cap or straight $12,000?</h2>
+        <div class="split2" id="compare"></div>
+      </section>
+
+      <section class="card">
+        <div class="eyebrow">How the math works</div>
+        <ul class="notes">
+          <li>Team model: the agent pays the team its SOI split until the team cap, plus the Zillow split on every Zillow deal. Out of that, the leader pays Real its 15% until the team member's Real cap ($6,000, or $4,000 once team volume passes $100M). The leader keeps the rest.</li>
+          <li>Real's 15% is figured on commission after the Zillow referral fee.</li>
+          <li>Independent model: the agent pays Real 15% until the $12,000 cap. The leader earns rev share on that company dollar: 33.33% on 1st line, 26.67% on 2nd, 20% on 3rd. At the full cap that is $4,000, $3,200 and $2,400 per agent.</li>
+          <li>Real requires a minimum count of capping front-line agents to unlock deeper rev share tiers. Confirm current unlock rules and fees with Real before presenting.</li>
+          <li>Post-cap fees are spread across the deals that close after the agent caps with Real.</li>
+          <li>Agents pay the C2 $39/month tech fee and their own TC, so the leader's costs stay near zero.</li>
+        </ul>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const num = (id) => { const v = parseFloat($(id).value); return isFinite(v) ? v : 0; };
+  const pct = (id) => num(id) / 100;
+  const usd = (v) => (v < 0 ? "−$" : "$") + Math.round(Math.abs(v)).toLocaleString("en-US");
+  const short = (v) => {
+    const a = Math.abs(v);
+    if (a >= 1e6) return "$" + (v / 1e6).toFixed(a >= 1e7 ? 0 : 1) + "M";
+    return usd(v);
+  };
+  const VOLUME_THRESHOLD = 100e6;
+
+  // Real post-cap fees: deals that close after the agent's Real company dollar hits the cap.
+  function postCapFees(realDue, cap, deals, fee) {
+    if (realDue <= 0 || realDue < cap) return 0;
+    return deals * (1 - cap / realDue) * fee;
+  }
+
+  function compute() {
+    const price = num("price"), txns = num("txns"), comm = pct("comm");
+    const soiPct = pct("soiPct"), zPct = pct("zPct");
+    const realSplit = pct("realSplit"), indCap = num("indCap");
+    const rs1 = pct("rs1"), rs2 = pct("rs2"), rs3 = pct("rs3");
+    const postFee = num("postCap"), annual = num("annual");
+    const techYr = num("tech") * 12, tc = num("tc");
+    const teamN = Math.max(0, num("teamN")), indN = Math.max(0, num("indN"));
+    const ratio = Math.max(0, num("ratio"));
+
+    const gci = price * txns * comm;
+    const teamVolume = teamN * price * txns;
+    const mode = $("teamCapMode").value;
+    const teamRealCap = mode === "auto" ? (teamVolume >= VOLUME_THRESHOLD ? 4000 : 6000) : parseFloat(mode);
+
+    // Team cap model, one agent
+    const gS = gci * soiPct, gZ = gci * zPct;
+    const zRef = gZ * pct("zFee");
+    const zTeamRaw = (gZ - zRef) * pct("zSplit");
+    const soiTeamRaw = gS * pct("soiSplit");
+    const cap = num("soiCap");
+    let soiTeam, zTeam;
+    if ($("zCap").checked) {
+      soiTeam = Math.min(soiTeamRaw, cap);
+      zTeam = Math.min(zTeamRaw, Math.max(0, cap - soiTeam));
+    } else {
+      soiTeam = Math.min(soiTeamRaw, cap);
+      zTeam = zTeamRaw;
+    }
+    const toTeam = soiTeam + zTeam;
+    const netGci = gci - zRef;
+    const tRealDue = netGci * realSplit;
+    const tReal = Math.min(tRealDue, teamRealCap);
+    const tRs = $("sponsorTeam").checked ? tReal * rs1 : 0;
+    const tLeader = toTeam - tReal + tRs;
+    const tPost = postCapFees(tRealDue, teamRealCap, txns, postFee);
+    const tAgent = gci - zRef - toTeam - tPost - annual - techYr - tc * txns;
+
+    // Independent $12k model, one first-line agent
+    const iShare = $("indFull").checked ? 1 : soiPct;
+    const iGci = gci * iShare, iTxns = txns * iShare;
+    const iRealDue = iGci * realSplit;
+    const iReal = Math.min(iRealDue, indCap);
+    const iRs = iReal * rs1;
+    const iPost = postCapFees(iRealDue, indCap, iTxns, postFee);
+    const iAgent = iGci - iReal - iPost - annual - techYr - tc * iTxns;
+
+    // Downline
+    const dReal = Math.min(num("dGci") * realSplit, indCap);
+    const d2Each = dReal * rs2, d3Each = dReal * rs3;
+    const perRecruitDown = ratio * d2Each + ratio * ratio * d3Each; // 2nd + 3rd line value per 1st-line recruit
+    const iWithDown = iRs + perRecruitDown;
+
+    // Roster
+    const line2N = indN * ratio, line3N = indN * ratio * ratio;
+    const teamInc = teamN * tLeader, indInc = indN * iRs;
+    const l2Inc = line2N * d2Each, l3Inc = line3N * d3Each;
+    const personal = num("personal"), leaderExp = num("leaderExp");
+    const rosterGross = teamInc + indInc + l2Inc + l3Inc;
+    const rosterNet = rosterGross + personal - leaderExp;
+
+    // Goal
+    const target = num("target");
+    const need = Math.max(0, target - personal + leaderExp);
+    const needTeam = tLeader > 0 ? Math.ceil(need / tLeader) : Infinity;
+    const needInd = iRs > 0 ? Math.ceil(need / iRs) : Infinity;
+    const needIndDown = iWithDown > 0 ? Math.ceil(need / iWithDown) : Infinity;
+    // Blended: keep the roster's team/independent mix (downline rides on independents)
+    let mixTeam = 0, mixInd = 0;
+    const totalRecruits = teamN + indN;
+    if (totalRecruits > 0) {
+      const perRecruit = (teamN * tLeader + indN * iWithDown) / totalRecruits;
+      if (perRecruit > 0) {
+        const total = Math.ceil(need / perRecruit);
+        mixTeam = Math.round(total * teamN / totalRecruits);
+        mixInd = total - mixTeam;
+      }
+    }
+
+    return { gci, gS, gZ, zRef, soiTeam, zTeam, toTeam, netGci, tReal, tRs, tLeader, tPost, tAgent,
+      teamRealCap, teamVolume, iGci, iTxns, iReal, iRs, iPost, iAgent, dReal, d2Each, d3Each, perRecruitDown, iWithDown,
+      line2N, line3N, teamInc, indInc, l2Inc, l3Inc, rosterGross, rosterNet, personal, leaderExp,
+      target, need, needTeam, needInd, needIndDown, mixTeam, mixInd, teamN, indN, ratio, txns, annual, techYr, tc, cap };
+  }
+
+  const fmtN = (n) => isFinite(n) ? n.toLocaleString("en-US") : "—";
+
+  function render() {
+    const r = compute();
+    $("gciNote").textContent = `Gross commission per agent: ${usd(r.gci)} a year.`;
+    $("teamCapNote").textContent = `Team volume ${short(r.teamVolume)} · using ${usd(r.teamRealCap)}`;
+
+    // Answer
+    $("goalHead").textContent = `Agents needed for ${usd(r.target)} a year`;
+    $("goalLede").textContent = r.need === 0
+      ? "Your own production already covers the goal."
+      : `After your own production and expenses, your agents need to produce ${usd(r.need)} for you.`;
+    $("answer").innerHTML = `
+      <div class="tile team"><span class="k">All team cap model (${usd(r.cap)} cap)</span><span class="big" style="color:var(--team)">${fmtN(r.needTeam)}</span><span class="n">team agents at ${usd(r.tLeader)} each</span></div>
+      <div class="tile ind"><span class="k">All independent, 1st line only</span><span class="big" style="color:var(--ind)">${fmtN(r.needInd)}</span><span class="n">agents at ${usd(r.iRs)} rev share each</span></div>
+      <div class="tile ind"><span class="k">Independent with downline</span><span class="big" style="color:var(--ind)">${fmtN(r.needIndDown)}</span><span class="n">1st-line recruits, each bringing ${r.ratio} more (${usd(r.iWithDown)} each)</span></div>
+      <div class="tile"><span class="k">Your current mix</span><span class="big">${fmtN(r.mixTeam + r.mixInd)}</span><span class="n">${fmtN(r.mixTeam)} team + ${fmtN(r.mixInd)} independent</span></div>`;
+
+    // Tiles
+    const diff = r.tLeader - r.iRs;
+    $("tiles").innerHTML = `
+      <div class="tile team"><span class="k">Leader earns · team agent</span><span class="v">${usd(r.tLeader)}</span><span class="n">Agent takes home ${usd(r.tAgent)}</span></div>
+      <div class="tile ind"><span class="k">Leader earns · independent agent</span><span class="v">${usd(r.iRs)}</span><span class="n">Agent takes home ${usd(r.iAgent)}</span></div>
+      <div class="tile"><span class="k">Team agent is worth</span><span class="v">${r.iRs > 0 ? (r.tLeader / r.iRs).toFixed(1) + "×" : "—"}</span><span class="n">${usd(Math.abs(diff))} ${diff >= 0 ? "more" : "less"} than an independent</span></div>`;
+
+    // Roster
+    $("rosterLede").textContent = `${fmtN(r.teamN)} team agents and ${fmtN(r.indN)} independents. Each recruit brings in ${r.ratio} agent${r.ratio === 1 ? "" : "s"}, so your 2nd line is about ${r.line2N.toFixed(1)} and your 3rd line about ${r.line3N.toFixed(1)}.`;
+    const rows = [
+      ["Team agents (team cap model)", r.teamN, r.tLeader, r.teamInc],
+      ["Independents, 1st line", r.indN, r.iRs, r.indInc],
+      ["Downline, 2nd line", r.line2N, r.d2Each, r.l2Inc],
+      ["Downline, 3rd line", r.line3N, r.d3Each, r.l3Inc],
+    ];
+    let html = `<thead><tr><th>Source</th><th>Agents</th><th>Per agent</th><th>Annual</th></tr></thead><tbody>`;
+    for (const [k, n, each, tot] of rows) html += `<tr><td>${k}</td><td>${Number.isInteger(n) ? n : n.toFixed(1)}</td><td>${usd(each)}</td><td>${usd(tot)}</td></tr>`;
+    html += `<tr><td>Your own production</td><td class="muted">—</td><td class="muted">—</td><td>${usd(r.personal)}</td></tr>`;
+    if (r.leaderExp) html += `<tr><td>Leader expenses</td><td class="muted">—</td><td class="muted">—</td><td class="neg">${usd(-r.leaderExp)}</td></tr>`;
+    const gap = r.rosterNet - r.target;
+    html += `<tr class="total"><td>Leader income</td><td></td><td></td><td>${usd(r.rosterNet)}</td></tr>`;
+    html += `<tr><td colspan="3">${gap >= 0 ? "Above" : "Short of"} your ${usd(r.target)} goal</td><td class="${gap < 0 ? "neg" : ""}">${usd(gap)}</td></tr></tbody>`;
+    $("roster").innerHTML = html;
+
+    // Waterfall
+    const L = (k, a, b, cls) => `<tr${cls ? ` class="${cls}"` : ""}><td>${k}</td><td class="${a < 0 ? "neg" : ""}">${a === null ? "—" : usd(a)}</td><td class="${b < 0 ? "neg" : ""}">${b === null ? "—" : usd(b)}</td></tr>`;
+    const S = (k) => `<tr class="sec"><td colspan="3">${k}</td></tr>`;
+    $("waterfall").innerHTML = `<thead><tr><th>Line</th><th class="team">Team cap model</th><th class="ind">Independent $12K</th></tr></thead><tbody>
+      ${S("Agent")}
+      ${L("Gross commission", r.gci, r.iGci)}
+      ${L("Zillow referral fee", -r.zRef, 0)}
+      ${L("Team split · SOI deals", -r.soiTeam, null)}
+      ${L("Team split · Zillow deals", -r.zTeam, null)}
+      ${L("Real split (paid by agent)", null, -r.iReal)}
+      ${L("Real post-cap fees", -r.tPost, -r.iPost)}
+      ${L("Real annual fee", -r.annual, -r.annual)}
+      ${L("C2 tech fee", -r.techYr, -r.techYr)}
+      ${L("Transaction coordinator", -r.tc * r.txns, -r.tc * r.iTxns)}
+      ${L("Agent take-home", r.tAgent, r.iAgent, "total")}
+      ${S("Team leader")}
+      ${L("Paid to the team", r.toTeam, null)}
+      ${L(`Real team cap (paid by leader)`, -r.tReal, null)}
+      ${L("Rev share, 1st line", r.tRs, r.iRs)}
+      ${L("Leader earns", r.tLeader, r.iRs, "total")}
+      ${S("Real Broker")}
+      ${L("Company dollar to Real", r.tReal, r.iReal)}
+    </tbody>`;
+
+    // Compare
+    const markup = Math.max(0, r.cap - r.teamRealCap);
+    $("compare").innerHTML = `
+      <div><span class="pill team">Team cap ${usd(r.cap)}</span>
+        <p>${usd(r.teamRealCap)} of the cap goes to Real and up to ${usd(markup)} stays with you, plus the Zillow split on every lead deal. You earn ${usd(r.tLeader)} per agent, so ${fmtN(r.needTeam)} agents reach your goal.</p>
+        <p class="sub">Best when you supply the leads. The agent's cost is higher, so the Zillow pipeline, coaching and C2 tools have to justify it.</p></div>
+      <div><span class="pill">Straight ${usd(num("indCap"))}</span>
+        <p>The agent pays Real directly and keeps more: ${usd(r.iAgent)} versus ${usd(r.tAgent)} on the team. You earn rev share only, ${usd(r.iRs)} per agent, so it takes ${fmtN(r.needInd)} first-line agents (${fmtN(r.needIndDown)} if each recruits ${r.ratio}).</p>
+        <p class="sub">Best for producers who don't need leads. It's an easier yes for recruiting, and the downline keeps paying with no management.</p></div>`;
+  }
+
+  // Keep the lead mix at 100%
+  const clamp = (v) => Math.min(100, Math.max(0, v));
+  $("soiPct").addEventListener("input", () => { $("zPct").value = clamp(100 - clamp(num("soiPct"))); });
+  $("zPct").addEventListener("input", () => { $("soiPct").value = clamp(100 - clamp(num("zPct"))); });
+
+  $("f").addEventListener("input", render);
+  $("f").addEventListener("change", render);
+  $("f").addEventListener("submit", (e) => e.preventDefault());
+  render();
+})();
+</script>
