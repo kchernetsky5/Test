@@ -59,6 +59,30 @@ header p { margin: 0; color: var(--muted); max-width: 66ch; }
 .how dt { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
 .how dd { margin: 0; }
 .how ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 2px; }
+.advisor { background: var(--surface); border: 1px solid var(--accent); border-radius: 14px; padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; }
+.advisor h2 { font-family: var(--f-display); font-size: 1.1rem; margin: 0; }
+.askrow { display: flex; gap: 8px; }
+.askrow input { flex: 1; min-width: 0; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.btn { font: inherit; font-weight: 600; border-radius: 10px; padding: 10px 16px; cursor: pointer; border: 1px solid var(--accent); background: var(--accent); color: var(--surface); white-space: nowrap; }
+.btn.ghost { background: transparent; color: var(--accent); }
+.btn:disabled { opacity: .55; cursor: default; }
+.btn:focus-visible, .chip:focus-visible, .linkbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { font: inherit; font-size: 13px; color: var(--accent); background: var(--accent-soft); border: 0; border-radius: 99px; padding: 5px 12px; cursor: pointer; }
+.thread { display: flex; flex-direction: column; gap: 12px; }
+.thread:empty { display: none; }
+.q { align-self: flex-end; max-width: 85%; background: var(--accent-soft); border-radius: 12px 12px 2px 12px; padding: 8px 12px; font-size: 14px; }
+.a { font-size: 14px; line-height: 1.55; min-width: 0; max-width: 70ch; }
+.a p, .a ul, .a ol, .a h4 { margin: 0 0 8px; }
+.a h4 { font-family: var(--f-display); font-size: 1rem; }
+.a ul, .a ol { padding-left: 20px; }
+.a .tablewrap { margin-bottom: 8px; }
+.a table { border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 13.5px; }
+.a th, .a td { border-bottom: 1px solid var(--line); padding: 4px 10px 4px 0; text-align: left; }
+.a .err { color: var(--neg); }
+.a .wait { color: var(--muted); }
+.advisor .sub { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.linkbtn { font: inherit; font-size: 12px; color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; }
 .need { grid-column: 1 / -1; font-size: 14px; color: var(--muted); margin: 0; }
 .need b { color: var(--ink); }
 
@@ -136,6 +160,23 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
     <p class="need" id="needLine"></p>
   </form>
 
+  <section class="advisor" id="advisor" hidden>
+    <h2>Ask the advisor</h2>
+    <form class="askrow" id="askForm" autocomplete="off">
+      <input id="ask" type="text" aria-label="Your question" placeholder="Ask about any model, split or number on this page">
+      <button class="btn" id="askBtn" type="submit">Ask</button>
+      <button class="btn ghost" id="stopBtn" type="button" hidden>Stop</button>
+    </form>
+    <div class="chips" id="chips">
+      <button class="chip" type="button">What split do full-team agents get here?</button>
+      <button class="chip" type="button">Walk me through the math on model 3</button>
+      <button class="chip" type="button">Which model fits a team of newer agents?</button>
+      <button class="chip" type="button">What happens if agents close fewer deals?</button>
+    </div>
+    <div class="thread" id="thread" aria-live="polite"></div>
+    <p class="sub"><span>Claude answers using the numbers currently on this page. Each question uses your own Claude usage.</span><button class="linkbtn" id="clearBtn" type="button" hidden>Clear conversation</button></p>
+  </section>
+
   <section class="models" id="models"></section>
 
   <section class="card">
@@ -204,6 +245,7 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   const usd = (v) => (v < 0 ? "−$" : "$") + Math.round(Math.abs(v)).toLocaleString("en-US");
   const short = (v) => v >= 1e6 ? "$" + (v / 1e6).toFixed(1) + "M" : usd(v);
   const MAX_AGENTS = 2000;
+  let lastState = null;
 
   function postCapFees(realDue, cap, deals, fee) {
     if (realDue <= 0 || realDue < cap) return 0;
@@ -331,6 +373,7 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
     const results = MODELS.map((m) => ({ m, r: solve(need, a, m.kind) }));
     const valid = results.filter((x) => x.r);
+    lastState = { a, results, need, target, personal };
     const fewest = valid.length ? Math.min(...valid.map((x) => x.r.n)) : null;
 
     $("models").innerHTML = results.map(({ m, r }, idx) => {
@@ -373,5 +416,123 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   $("goalForm").addEventListener("submit", (e) => e.preventDefault());
   $("assumeForm").addEventListener("submit", (e) => e.preventDefault());
   render();
+
+  // ---- Ask the advisor ----
+  function snapshot() {
+    const { a, results, need, target, personal } = lastState;
+    const tmp = document.createElement("div");
+    const lines = [
+      `Income goal: ${usd(target)}. Leader's own production income: ${usd(personal)}. Agents must bring the leader: ${usd(need)}.`,
+      `Typical agent: ${a.txns} deals/year at ${usd(a.price)} average price, ${num("comm")}% commission per side = ${usd(a.gci)} GCI (${usd(a.gS)} SOI, ${usd(a.gZ)} Zillow at ${num("zPct")}%).`,
+      `Zillow referral fee ${num("zFee")}% (${usd(a.zRef)} per agent), leaving ${usd(a.zNet)} of Zillow commission to split; leader's share of Zillow after the fee: ${num("zSplit")}%.`,
+      `Real Broker: ${num("realSplit")}% split until cap (figured after Zillow's fee); independent cap ${usd(num("indCap"))}; team member cap $6,000, dropping to $4,000 once team volume passes $100M; rev share 1st line ${num("rs1")}% (2nd line 26.67%, 3rd line 20% exist but are not counted); post-cap fee ${usd(num("postCap"))}/deal; annual fee ${usd(num("annual"))}.`,
+      `Agent-paid costs: C2 tech fee ${usd(num("tech"))}/month, TC ${usd(num("tc"))}/deal. Leader has no other expenses except where a model says so.`,
+      `Model 1 leader profit setting: ${num("profit")}% of GCI. Model 2 mix: ${num("mix")}% full-team agents. Model 4: ${num("m4Split")}% SOI split to ${usd(num("m4Cap"))} cap, then ${num("m4After")}%.`,
+      "",
+    ];
+    results.forEach(({ m, r }, i) => {
+      lines.push(`MODEL ${i + 1}: ${m.name}. ${m.desc}`);
+      if (!r) { lines.push("Cannot reach the goal with these inputs.", ""); return; }
+      if (m.kind === "hybrid") lines.push(`Agents needed: ${r.n} (${r.t} full-team + ${r.i} independents). Each full-team agent earns the leader ${usd(r.per.leader)}; each independent ${usd(r.ind.leader)}; independents take home ${usd(r.ind.agent)}.`);
+      else {
+        const per = m.kind === "ind" ? r.ind : r.per;
+        lines.push(`Agents needed: ${r.n}. Leader earns per agent ${usd(per.leader)}: ${per.lines.map(([k, v]) => `${k} ${usd(v)}`).join("; ")}.` + (per.agent !== null ? ` Agent takes home about ${usd(per.agent)} after all fees.` : ""));
+      }
+      if (r.t > 0) lines.push(`Team volume ${short(r.t * a.volume)}, Real team cap ${usd(r.cap)}.`);
+      lines.push(`Leader's total income: ${usd(r.income + personal)}.`);
+      tmp.innerHTML = how(m.kind, a, r).replace(/<\/(dd|li)>/g, " ").replace(/<dt>/g, "\n").replace(/<\/dt>/g, ": ");
+      lines.push("How it works:" + tmp.textContent.replace(/[ \t]+/g, " "), "");
+    });
+    return lines.join("\n");
+  }
+
+  const RULES = `You are the advisor built into a team-economics calculator for a Real Broker team leader at C2 Realty. The viewer is a team leader or prospective team leader comparing four ways to build a team and how many agents each needs to reach an income goal.
+
+Answer the viewer's question using the model and the live numbers below. When they ask about math, show it step by step with the actual dollar figures from the page. When they ask "what if", recompute with the same rules and say it is your estimate, and suggest which input on the page to change to see it exactly. Keep answers short and practical: a few short paragraphs, bullets, or a small markdown table. No headings above level 4. If an answer depends on Real Broker rules or fees the page does not include, say what to confirm with Real rather than guessing. Do not give tax or legal advice.
+
+CURRENT PAGE STATE
+`;
+
+  const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const inline = (t) => esc(t).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/`([^`]+)`/g, "$1");
+  // Small markdown renderer: paragraphs, bullets, numbered lists, headings, bold, pipe tables.
+  function md(src) {
+    const out = [];
+    const blocks = src.replace(/\r/g, "").split(/\n{2,}/);
+    for (const b of blocks) {
+      const ls = b.split("\n").filter((l) => l.trim());
+      if (!ls.length) continue;
+      if (ls.every((l) => /^\s*\|/.test(l))) {
+        const rows = ls.filter((l) => !/^\s*\|?\s*:?-{2,}/.test(l)).map((l) => l.trim().replace(/^\||\|$/g, "").split("|").map((c) => inline(c.trim())));
+        const [head, ...body] = rows;
+        out.push(`<div class="tablewrap"><table><thead><tr>${head.map((c) => `<th>${c}</th>`).join("")}</tr></thead><tbody>${body.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`);
+        continue;
+      }
+      let list = null, para = [];
+      const flush = () => { if (para.length) { out.push(`<p>${para.join("<br>")}</p>`); para = []; } if (list) { out.push(`<${list.tag}>${list.items.map((i) => `<li>${i}</li>`).join("")}</${list.tag}>`); list = null; } };
+      for (const l of ls) {
+        const h = l.match(/^#{1,6}\s+(.*)/), ul = l.match(/^\s*[-*•]\s+(.*)/), ol = l.match(/^\s*\d+[.)]\s+(.*)/);
+        if (h) { flush(); out.push(`<h4>${inline(h[1])}</h4>`); }
+        else if (ul || ol) {
+          const tag = ul ? "ul" : "ol";
+          if (para.length || (list && list.tag !== tag)) flush();
+          if (!list) list = { tag, items: [] };
+          list.items.push(inline((ul || ol)[1]));
+        } else { if (list) flush(); para.push(inline(l)); }
+      }
+      flush();
+    }
+    return out.join("");
+  }
+
+  const ERRORS = {
+    rate_limited: "Too many questions at once, or you've reached your Claude usage limit. Try again in a bit.",
+    session_expired: "Your Claude session expired. Sign in again, then ask.",
+    refused: "Claude couldn't answer that one. Try rephrasing the question.",
+    empty_completion: "No answer came back. Try asking a simpler question.",
+    prompt_too_large: "The conversation got too long. Clear it and ask again.",
+  };
+  const HIDE = ["not_granted", "sampling_disabled", "not_declared", "capability_disabled", "capability_removed"];
+
+  (async () => {
+    const sample = window.claude ? await window.claude.use("sample").catch(() => null) : null;
+    if (!sample) return;
+    const box = $("advisor"), input = $("ask"), askBtn = $("askBtn"), stopBtn = $("stopBtn"), thread = $("thread"), clearBtn = $("clearBtn");
+    box.hidden = false;
+    let turns = [], ctl = null;
+
+    async function ask(question) {
+      question = question.trim();
+      if (!question || ctl) return;
+      input.value = "";
+      const q = document.createElement("div"); q.className = "q"; q.textContent = question;
+      const ans = document.createElement("div"); ans.className = "a"; ans.innerHTML = '<p class="wait">Thinking…</p>';
+      thread.append(q, ans);
+      clearBtn.hidden = false;
+      turns.push({ role: "user", content: question });
+      ctl = new AbortController();
+      askBtn.disabled = true; stopBtn.hidden = false;
+      try {
+        const { text, truncated } = await sample([{ role: "user", content: RULES + snapshot() }, ...turns.slice(-12)], {
+          cache: false, signal: ctl.signal, onText: ({ text }) => { ans.innerHTML = md(text); },
+        });
+        ans.innerHTML = md(text) + (truncated ? '<p class="wait">The answer was cut short. Ask a narrower question for the rest.</p>' : "");
+        turns.push({ role: "assistant", content: text });
+      } catch (e) {
+        turns.pop();
+        if (HIDE.includes(e.code)) { box.hidden = true; return; }
+        const kept = e.text ? md(e.text) : "";
+        ans.innerHTML = e.code === "cancelled" ? (kept || '<p class="wait">Stopped.</p>')
+          : kept + `<p class="err">${esc(ERRORS[e.code] || "Something went wrong reaching Claude. Try again.")}</p>`;
+      } finally {
+        ctl = null; askBtn.disabled = false; stopBtn.hidden = true;
+      }
+    }
+
+    $("askForm").addEventListener("submit", (e) => { e.preventDefault(); ask(input.value); });
+    stopBtn.addEventListener("click", () => ctl?.abort());
+    $("chips").addEventListener("click", (e) => { if (e.target.matches(".chip")) ask(e.target.textContent); });
+    clearBtn.addEventListener("click", () => { ctl?.abort(); turns = []; thread.innerHTML = ""; clearBtn.hidden = true; });
+  })();
 })();
 </script>
