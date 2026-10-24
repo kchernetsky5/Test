@@ -47,6 +47,18 @@ header p { margin: 0; color: var(--muted); max-width: 66ch; }
 .money { position: relative; display: flex; align-items: center; }
 .money span { position: absolute; left: 14px; font-family: var(--f-display); font-size: 1.5rem; color: var(--muted); pointer-events: none; }
 .money input { width: 100%; font-family: var(--f-display); font-weight: 700; font-size: 1.9rem; font-variant-numeric: tabular-nums; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 14px 8px 34px; }
+.agentrow { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 24px; padding-top: 16px; border-top: 1px solid var(--line); }
+@media (max-width: 640px) { .agentrow { grid-template-columns: minmax(0, 1fr); } }
+.money.sm span { font-size: 1.1rem; }
+.money.sm input { font-size: 1.35rem; padding: 6px 12px; }
+.money.sm span + input { padding-left: 28px; }
+.money.suf span { left: auto; right: 14px; }
+.money.suf input { padding-right: 34px; }
+.how { margin: 0; display: flex; flex-direction: column; gap: 10px; font-size: 13.5px; background: var(--bg); border-radius: 10px; padding: 14px 16px; }
+.how div { display: flex; flex-direction: column; gap: 2px; }
+.how dt { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.how dd { margin: 0; }
+.how ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 2px; }
 .need { grid-column: 1 / -1; font-size: 14px; color: var(--muted); margin: 0; }
 .need b { color: var(--ink); }
 
@@ -110,6 +122,17 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
     <label for="personal">Your own production income <small>What you net from your personal deals</small>
       <div class="money"><span>$</span><input id="personal" type="number" step="5000" min="0" value="0"></div>
     </label>
+    <div class="agentrow">
+      <label for="txns">Deals per agent per year
+        <div class="money sm"><input id="txns" type="number" step="1" min="0" value="12"></div>
+      </label>
+      <label for="price">Average price point
+        <div class="money sm"><span>$</span><input id="price" type="number" step="10000" min="0" value="400000"></div>
+      </label>
+      <label for="zPct">Business from Zillow
+        <div class="money sm suf"><input id="zPct" type="number" step="5" min="0" max="100" value="40"><span>%</span></div>
+      </label>
+    </div>
     <p class="need" id="needLine"></p>
   </form>
 
@@ -125,10 +148,7 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
     <form class="assume" id="assumeForm" autocomplete="off">
       <fieldset>
         <legend>Typical agent</legend>
-        <div class="row"><label for="price">Average sale price</label><div class="field pre"><span class="u">$</span><input id="price" type="number" step="10000" value="400000"></div></div>
-        <div class="row"><label for="txns">Closed deals per year</label><div class="field"><input id="txns" type="number" step="1" value="12"></div></div>
         <div class="row"><label for="comm">Commission per side</label><div class="field suf"><span class="u">%</span><input id="comm" type="number" step="0.1" value="2.5"></div></div>
-        <div class="row"><label for="zPct">Business from Zillow</label><div class="field suf"><span class="u">%</span><input id="zPct" type="number" step="5" min="0" max="100" value="40"></div></div>
         <p class="sub" id="agentNote"></p>
       </fieldset>
       <fieldset>
@@ -260,6 +280,46 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
       desc: "Agents pay 25% on SOI until a $15,000 cap, then 5% after. Zillow deals split 50/50. You pay Real each member's team cap." },
   ];
 
+  // Plain-language walkthrough of each model, using the live numbers.
+  function how(kind, a, r) {
+    const z = num("zSplit"), zFee = num("zFee"), rsPct = num("rs1"), postFee = usd(num("postCap"));
+    const indCap = usd(num("indCap")), tech = usd(num("tech")), cap = usd(r.cap);
+    const zillowLine = `Zillow deals: Zillow takes its ${zFee}% referral fee at closing, then the rest splits ${100 - z}/${z} between the agent and you.`;
+    const indSplit = `Own (SOI) deals: they keep 85% and pay Real 15% until they've paid Real ${indCap} for the year. After that they keep 100%, less Real's ${postFee} per-deal fee.`;
+    const block = (dt, body) => `<div><dt>${dt}</dt><dd>${body}</dd></div>`;
+    const list = (items) => `<ul>${items.map((x) => `<li>${x}</li>`).join("")}</ul>`;
+    if (kind === "full") {
+      const [profit, rs] = r.per.lines.map((l) => l[1]);
+      return block("Agent's split", `You set it. Lead-funded teams commonly pay agents around 50% on leads the team provides and a higher split on their own SOI deals. Whatever you choose has to cover your costs and still leave you ${num("profit")}% of what each agent closes.`)
+        + block("How you make money", list([`${num("profit")}% profit on each agent's ${usd(a.gci)} GCI: ${usd(profit)}`, `${rsPct}% rev share on the ${cap} Real team cap you pay for them: ${usd(rs)}`]))
+        + block("Who pays what", `You pay for leads, tech, admin and TC support, plus each agent's ${cap} Real team cap. Zillow's referral fee comes off the top of every Zillow deal.`)
+        + block("Best fit", "Newer agents who need leads, training and hands-on support.");
+    }
+    if (kind === "hybrid") {
+      return block("Agent's split", list([`Full-team agents: the same as model 1. You set the split and supply leads and support.`, `Independents: ${indSplit.replace("Own (SOI) deals: they", "on their own deals they")}`, `Independents on Zillow deals: Zillow takes ${zFee}%, then the rest splits ${100 - z}/${z} with you.`]))
+        + block("How you make money", list([`Each full-team agent: ${usd(r.per.leader)} (${num("profit")}% profit plus rev share)`, `Each independent: ${usd(r.ind.lines[1][1])} rev share once they cap, plus ${usd(r.ind.lines[0][1])} from their Zillow deals, for ${usd(r.ind.leader)}`]))
+        + block("Who pays what", `You carry costs only for the full-team side. Independents pay Real directly, plus the ${tech}/month C2 tech fee and their own TC.`)
+        + block("Best fit", "Keeping a core team you support while recruiting experienced agents who want a lower cap.");
+    }
+    if (kind === "ind") {
+      const [zl, rs] = r.ind.lines.map((l) => l[1]);
+      return block("Agent's split", list([indSplit, zillowLine]))
+        + block("How you make money", list([`${rsPct}% rev share on what they pay Real: ${usd(rs)} a year once they hit the ${indCap} cap`, `Your ${z}% of their Zillow deals after Zillow's fee: ${usd(zl)}`]))
+        + block("Who pays what", `You have no expenses. Agents pay Real's split and fees, the ${tech}/month C2 tech fee, and their own TC on each deal.`)
+        + block("Best fit", "Self-sufficient producers who want the lowest cap but still want Zillow leads. Confirm with Real how the Zillow split is set up for independent agents.");
+    }
+    const split = num("m4Split"), after = num("m4After"), teamCap = num("m4Cap");
+    const soiAtCap = split > 0 ? teamCap / (split / 100) : Infinity;
+    const capNote = a.gS > soiAtCap
+      ? `With ${usd(a.gS)} of SOI commission, the agent hits the cap after ${usd(soiAtCap)} and pays ${after}% on the remaining ${usd(a.gS - soiAtCap)}.`
+      : `With ${usd(a.gS)} of SOI commission, the agent doesn't reach the cap (that takes ${usd(soiAtCap)}).`;
+    const [soi, zl, real, rs] = r.per.lines.map((l) => l[1]);
+    return block("Agent's split", list([`Own (SOI) deals: ${100 - split}/${split} until they've paid the team ${usd(teamCap)}. After that, ${100 - after}/${after} on every SOI deal. ${capNote}`, zillowLine + " Zillow splits don't count toward the cap."]))
+      + block("How you make money", list([`SOI split: ${usd(soi)}`, `Your ${z}% of their Zillow deals: ${usd(zl)}`, `Minus the Real team cap you pay for them: ${usd(real)}`, `Plus ${rsPct}% rev share on that cap: ${usd(rs)}`]))
+      + block("Who pays what", `You pay Real each member's team cap (${cap}; it drops to $4,000 once the team passes $100M in volume). Agents pay the ${tech}/month C2 tech fee, their own TC, and Real's post-cap and annual fees.`)
+      + block("Best fit", "Agents who want team structure and Zillow leads with a predictable cap.");
+  }
+
   function render() {
     const a = agentBase();
     const target = num("target"), personal = num("personal");
@@ -267,7 +327,7 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
     $("agentNote").textContent = `${usd(a.gci)} GCI a year: ${usd(a.gS)} SOI, ${usd(a.gZ)} Zillow.`;
     $("needLine").innerHTML = need === 0
       ? "Your own production already covers your goal."
-      : `Your agents need to bring you <b>${usd(need)}</b> a year. Each agent below closes ${a.txns} deals at ${usd(a.price)}, with ${num("zPct")}% from Zillow.`;
+      : `Your agents need to bring you <b>${usd(need)}</b> a year. Each agent brings in ${usd(a.gci)} in commission: ${usd(a.gS)} from their own deals and ${usd(a.gZ)} from Zillow, at ${num("comm")}% per side.`;
 
     const results = MODELS.map((m) => ({ m, r: solve(need, a, m.kind) }));
     const valid = results.filter((x) => x.r);
@@ -294,6 +354,7 @@ input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
         <div class="headline"><span class="n">${r.n}</span><span class="l">agents</span>${mixLine}</div>
         <table class="lines">${lines}<tr><td>Your total income</td><td>${usd(r.income + personal)}</td></tr></table>
         <p class="foot">${foot}</p>
+        <dl class="how">${how(m.kind, a, r)}</dl>
       </article>`;
     }).join("");
 
